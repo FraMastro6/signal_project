@@ -52,12 +52,12 @@ public class Patient {
      *         range
      */
     public List<PatientRecord> getRecords(long startTime, long endTime) {
-        List<PatientRecord> temp = new ArrayList<>(patientRecords);
-        for (int i=0; i<temp.toArray().length; i++){
-            if (temp.get(i).getTimestamp()>endTime && temp.get(i).getTimestamp()<startTime){
-                patientRecords.remove(i);
+        List<PatientRecord> filteredRecords = new ArrayList<>();
+        for (int i=0; i<patientRecords.toArray().length; i++){
+            if (patientRecords.get(i).getTimestamp()<=endTime && patientRecords.get(i).getTimestamp()>=startTime){
+                filteredRecords.add(patientRecords.get(i));
             }
         }
-        return patientRecords;
+        return filteredRecords;
     }
 }

@@ -25,6 +25,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 
+/**
+ *  Main simulator for generating and scheduling patient health data streams.
+ *  Configures the system, creates patient IDs, and schedules periodic generation
+ *  of multiple health signals using a selected output strategy.
+ */
 public class HealthDataSimulator {
 
     private static int patientCount = 50; // Default number of patients
@@ -32,6 +37,11 @@ public class HealthDataSimulator {
     private static OutputStrategy outputStrategy = new ConsoleOutputStrategy(); // Default output strategy
     private static final Random random = new Random();
 
+    /**
+     * Initializes configuration, patients, and starts simulation.
+     * @param args command line arguments
+     * @throws IOException if file output fails
+     */
     public static void main(String[] args) throws IOException {
 
         parseArguments(args);
@@ -44,6 +54,11 @@ public class HealthDataSimulator {
         scheduleTasksForPatients(patientIds);
     }
 
+    /**
+     * Parses command-line arguments to configure the simulator.
+     * @param args command-line arguments
+     * @throws IOException if file output fails
+     */
     private static void parseArguments(String[] args) throws IOException {
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -105,6 +120,9 @@ public class HealthDataSimulator {
         }
     }
 
+    /**
+     * Prints usage instructions and available command-line options.
+     */
     private static void printHelp() {
         System.out.println("Usage: java HealthDataSimulator [options]");
         System.out.println("Options:");
@@ -122,6 +140,11 @@ public class HealthDataSimulator {
                 "  This command simulates data for 100 patients and sends the output to WebSocket clients connected to port 8080.");
     }
 
+    /**
+     * Initializes a list of patient IDs from 1 to the given count.
+     * @param patientCount number of patients
+     * @return list of patients IDs
+     */
     private static List<Integer> initializePatientIds(int patientCount) {
         List<Integer> patientIds = new ArrayList<>();
         for (int i = 1; i <= patientCount; i++) {
@@ -130,6 +153,10 @@ public class HealthDataSimulator {
         return patientIds;
     }
 
+    /**
+     * Schedules periodic generation tasks for all patients.
+     * @param patientIds
+     */
     private static void scheduleTasksForPatients(List<Integer> patientIds) {
         ECGDataGenerator ecgDataGenerator = new ECGDataGenerator(patientCount);
         BloodSaturationDataGenerator bloodSaturationDataGenerator = new BloodSaturationDataGenerator(patientCount);
@@ -146,6 +173,12 @@ public class HealthDataSimulator {
         }
     }
 
+    /**
+     * Schedules a task at a fixed rate with a randomized initial delay.
+     * @param task task to execute
+     * @param period execution interval
+     * @param timeUnit time unit of the interval
+     */
     private static void scheduleTask(Runnable task, long period, TimeUnit timeUnit) {
         scheduler.scheduleAtFixedRate(task, random.nextInt(5), period, timeUnit);
     }
