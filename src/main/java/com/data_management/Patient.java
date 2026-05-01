@@ -60,4 +60,12 @@ public class Patient {
         }
         return filteredRecords;
     }
+
+    public List<PatientRecord> getPatientRecords() {
+        return patientRecords;
+    }
+
+    public int getPatientId() {
+        return patientId;
+    }
 }
