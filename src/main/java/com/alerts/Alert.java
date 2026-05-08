@@ -1,26 +1,12 @@
 package com.alerts;
 
-// Represents an alert
-public class Alert {
-    private int patientId;
-    private String condition;
-    private long timestamp;
+/**
+ * Interface representing an alert
+ */
+public interface Alert {
+    int getPatientId();
 
-    public Alert(int patientId, String condition, long timestamp) {
-        this.patientId = patientId;
-        this.condition = condition;
-        this.timestamp = timestamp;
-    }
+    String getCondition();
 
-    public int getPatientId() {
-        return patientId;
-    }
-
-    public String getCondition() {
-        return condition;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
+    long getTimestamp();
 }

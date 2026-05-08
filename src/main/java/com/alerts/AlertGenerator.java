@@ -1,5 +1,12 @@
 package com.alerts;
 
+import com.alerts.factories.BloodOxygenAlertFactory;
+import com.alerts.factories.BloodPressureAlertFactory;
+import com.alerts.factories.ECGAlertFactory;
+import com.alerts.strategies.AlertStrategy;
+import com.alerts.strategies.BloodPressureStrategy;
+import com.alerts.strategies.HeartRateStrategy;
+import com.alerts.strategies.OxygenSaturationStrategy;
 import com.data_management.DataStorage;
 import com.data_management.Patient;
 import com.data_management.PatientRecord;
@@ -21,6 +28,13 @@ import static java.lang.Math.abs;
 public class AlertGenerator {
     private DataStorage dataStorage;
     private List<Alert> alerts = new ArrayList<>();
+    private final List<AlertStrategy> strategies = new ArrayList<>();
+
+
+    //Factories
+    private final BloodPressureAlertFactory bloodPressureFactory = new BloodPressureAlertFactory();
+    private final BloodOxygenAlertFactory bloodOxygenFactory = new BloodOxygenAlertFactory();
+    private final ECGAlertFactory ecgFactory = new ECGAlertFactory();
 
     /**
      * Constructs an {@code AlertGenerator} with a specified {@code DataStorage}.
@@ -32,6 +46,10 @@ public class AlertGenerator {
      */
     public AlertGenerator(DataStorage dataStorage) {
         this.dataStorage = dataStorage;
+
+        strategies.add(new BloodPressureStrategy());
+        strategies.add(new HeartRateStrategy());
+        strategies.add(new OxygenSaturationStrategy());
     }
 
     /**
@@ -49,7 +67,11 @@ public class AlertGenerator {
         Instant instant = Instant.now();
         long timeStampMillis = instant.toEpochMilli();
 
-        // pressure check: Trend Alert
+        for (AlertStrategy strategy : strategies) {
+            strategy.checkAlert(patient, dataStorage).forEach(this::triggerAlert);
+        }
+
+        //Hypotensive Hypoxemia Alert
         List<PatientRecord> systolicRecords = records.stream()
                 .filter(x -> x.getRecordType().equalsIgnoreCase("systolic"))
                 .sorted(Comparator.comparingLong(PatientRecord::getTimestamp))
@@ -59,73 +81,19 @@ public class AlertGenerator {
                 .filter(x -> x.getRecordType().equalsIgnoreCase("diastolic"))
                 .sorted(Comparator.comparingLong(PatientRecord::getTimestamp))
                 .collect(Collectors.toList());
-
-        checkPressureTrend(systolicRecords, patient, timeStampMillis);
-        checkPressureTrend(diastolicRecords, patient, timeStampMillis);
-
-        //pressure check : Critical Threshold Alert
-        for(PatientRecord record : systolicRecords) {
-            if (record.getMeasurementValue() > 180 || record.getMeasurementValue() < 90) {
-                triggerAlert(new Alert(patient.getPatientId(), "Critical Systolic Alert", timeStampMillis));
-            }
-        }
-        for (PatientRecord record : diastolicRecords){
-            if (record.getMeasurementValue() > 120 || record.getMeasurementValue() < 60) {
-                triggerAlert(new Alert(patient.getPatientId(), "Critical Diastolic Alert", timeStampMillis));
-            }
-        }
-
-
-        //low saturation
         List<PatientRecord> saturationRecords = records.stream().filter(x -> x.getRecordType().equalsIgnoreCase("saturation")).sorted(Comparator.comparingLong(PatientRecord::getTimestamp)).collect(Collectors.toList());
-        for (PatientRecord record : saturationRecords){
-            if (record.getMeasurementValue()<92){
-                triggerAlert(new Alert(patient.getPatientId(), "Low saturation Alert", timeStampMillis));
-            }
-        }
-
-        //Saturation drop
-        for(int i=0; i<saturationRecords.size()-1; i++){
-            PatientRecord r1 = saturationRecords.get(i);
-            PatientRecord r2 = saturationRecords.get(i+1);
-            double drop = r1.getMeasurementValue()- r2.getMeasurementValue();
-            long timeDifference = (r2.getTimestamp() - r1.getTimestamp())/60000; //difference in milliseconds -> sec -> min
-            if (drop>=5 && timeDifference<=10){
-                triggerAlert(new Alert(patient.getPatientId(), "Rapid Saturation Drop Alert", timeStampMillis));
-            }
-        }
 
         //Combined Alert: Hypotensive Hypoxemia Alert
         //Maybe to add at critical Threshold check for optimization
-        for(PatientRecord record : systolicRecords){
-            if(record.getMeasurementValue()<90){
-                for (PatientRecord record_ : saturationRecords){
-                    if (record_.getMeasurementValue()<92){
-                        triggerAlert(new Alert(patient.getPatientId(), "ALERT : Hypotensive Hypoxemia Alert", timeStampMillis));
+        for (PatientRecord record : systolicRecords) {
+            if (record.getMeasurementValue() < 90) {
+                for (PatientRecord record_ : saturationRecords) {
+                    if (record_.getMeasurementValue() < 92) {
+                        Alert alert = new BasicAlert(patient.getPatientId(), "ALERT : Hypotensive Hypoxemia Alert", timeStampMillis);
+                        alert = new PriorityAlertDecorator(alert, 5);
+                        alert = new RepeatedAlertDecorator(alert, 3, 60000);
+                        triggerAlert(alert);
                     }
-                }
-            }
-        }
-        List<PatientRecord> ecgRecords = records.stream()
-                .filter(r -> r.getRecordType().equalsIgnoreCase("ECG"))
-                .sorted(Comparator.comparingLong(PatientRecord::getTimestamp))
-                .collect(Collectors.toList());
-        int windowSize = 3;
-
-        for (int i = 0; i <= ecgRecords.size() - windowSize; i++) {
-
-            List<PatientRecord> window = ecgRecords.subList(i, i + windowSize);
-
-            double avg = window.stream()
-                    .mapToDouble(PatientRecord::getMeasurementValue)
-                    .average()
-                    .orElse(0);
-
-            for (PatientRecord record : window) {
-                double value = record.getMeasurementValue();
-
-                if (value > avg * 1.5) {
-                    triggerAlert(new Alert(patient.getPatientId(), "ECG Abnormal Spike", timeStampMillis));
                 }
             }
         }
@@ -136,7 +104,7 @@ public class AlertGenerator {
                 .collect(Collectors.toList());
         for (PatientRecord record : buttonAlerts) {
             if (record.getMeasurementValue() == 1.0) {
-                triggerAlert(new Alert(patient.getPatientId(),
+                triggerAlert(new BasicAlert(patient.getPatientId(),
                         "Manual Alert Button Triggered", timeStampMillis));
             }
         }
@@ -154,43 +122,6 @@ public class AlertGenerator {
         // Implementation might involve logging the alert or notifying staff
         //TODO Full method implementation
         alerts.add(alert);
-
-    }
-
-    /**
-     * Checks for increasing or decreasing pressure trends
-     *
-     * @param filtered
-     * @param patient
-     * @param timeStampMillis
-     */
-    private void checkPressureTrend(List<PatientRecord> filtered,
-                                    Patient patient,
-                                    long timeStampMillis) {
-
-        for (int i = 0; i < filtered.size() - 2; i++) {
-
-            double v1 = filtered.get(i).getMeasurementValue();
-            double v2 = filtered.get(i + 1).getMeasurementValue();
-            double v3 = filtered.get(i + 2).getMeasurementValue();
-
-            boolean increasing =
-                    (v2 - v1 > 10) &&
-                            (v3 - v2 > 10);
-
-            boolean decreasing =
-                    (v1 - v2 > 10) &&
-                            (v2 - v3 > 10);
-
-            if (increasing || decreasing) {
-
-                triggerAlert(new Alert(
-                        patient.getPatientId(),
-                        "Pressure Trend Alert",
-                        timeStampMillis
-                ));
-            }
-        }
     }
 
     public List<Alert> getAlerts() {

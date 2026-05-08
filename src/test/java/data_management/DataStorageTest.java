@@ -2,7 +2,7 @@ package data_management;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.alerts.AlertGenerator;
+import com.alerts.*;
 import com.data_management.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -322,6 +322,60 @@ class DataStorageTest {
         alertGenerator.evaluateData(getPatient());
 
         assertTrue(alertGenerator.getAlerts().isEmpty());
+    }
+
+    //New tests for Decorators
+    private static final long TIMESTAMP = 1700000000000L;
+    private static final String BASE_CONDITION = "Critical Heart Rate";
+
+    @Test
+    @DisplayName("PriorityAlertDecorator correctly modifies the condition string")
+    void testPriorityDecoratorModifiesCondition() {
+        Alert baseAlert = new BasicAlert(PATIENT_ID, BASE_CONDITION, TIMESTAMP);
+        Alert priorityAlert = new PriorityAlertDecorator(baseAlert, 3);
+
+        String condition = priorityAlert.getCondition();
+
+        assertTrue(condition.contains("PRIORITY: 3"), "Condition should contain the priority tag.");
+        assertTrue(condition.contains(BASE_CONDITION), "Condition should still contain the base message.");
+    }
+
+    @Test
+    @DisplayName("RepeatedAlertDecorator correctly modifies the condition string")
+    void testRepeatedDecoratorModifiesCondition() {
+        Alert baseAlert = new BasicAlert(PATIENT_ID, BASE_CONDITION, TIMESTAMP);
+        Alert repeatedAlert = new RepeatedAlertDecorator(baseAlert, 5, 30000);
+
+        String condition = repeatedAlert.getCondition();
+
+        assertTrue(condition.contains("Repeats 5 times"), "Condition should show repetition count.");
+        assertTrue(condition.contains("30000ms"), "Condition should show interval.");
+        assertTrue(condition.contains(BASE_CONDITION), "Condition should still contain the base message.");
+    }
+
+    @Test
+    @DisplayName("Decorators can be stacked together successfully")
+    void testStackedDecorators() {
+        Alert baseAlert = new BasicAlert(PATIENT_ID, BASE_CONDITION, TIMESTAMP);
+        Alert priorityAlert = new PriorityAlertDecorator(baseAlert, 1);
+        Alert fullyDecoratedAlert = new RepeatedAlertDecorator(priorityAlert, 2, 10000);
+
+        String condition = fullyDecoratedAlert.getCondition();
+
+        assertTrue(condition.contains("PRIORITY: 1"), "Should contain priority from first decorator.");
+        assertTrue(condition.contains("Repeats 2 times"), "Should contain repeat info from second decorator.");
+        assertTrue(condition.contains(BASE_CONDITION), "Should contain base message.");
+    }
+
+
+    @Test
+    @DisplayName("RepeatedAlertDecorator getters return correct values")
+    void testRepeatedDecoratorGetters() {
+        Alert baseAlert = new BasicAlert(PATIENT_ID, BASE_CONDITION, TIMESTAMP);
+        RepeatedAlertDecorator repeatedAlert = new RepeatedAlertDecorator(baseAlert, 4, 15000);
+
+        assertEquals(4, repeatedAlert.getRepetitions(), "Should return correct repetitions.");
+        assertEquals(15000, repeatedAlert.getInterval_ms(), "Should return correct interval.");
     }
 
 }

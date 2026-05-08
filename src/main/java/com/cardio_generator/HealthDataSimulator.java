@@ -37,6 +37,16 @@ public class HealthDataSimulator {
     private static OutputStrategy outputStrategy = new ConsoleOutputStrategy(); // Default output strategy
     private static final Random random = new Random();
 
+    //singleton
+    private static HealthDataSimulator instance;
+
+    private HealthDataSimulator getInstance(){
+        if(instance==null){
+            instance = new HealthDataSimulator();
+        }
+        return instance;
+    }
+
     /**
      * Initializes configuration, patients, and starts simulation.
      * @param args command line arguments

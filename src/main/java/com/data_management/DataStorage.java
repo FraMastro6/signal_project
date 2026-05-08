@@ -16,6 +16,15 @@ import com.alerts.AlertGenerator;
 public class DataStorage {
     private Map<Integer, Patient> patientMap; // Stores patient objects indexed by their unique patient ID.
 
+    //Singleton
+    private static DataStorage instance;
+    public static DataStorage getInstance(){
+        if(instance == null){
+            instance = new DataStorage();
+        }
+        return instance;
+    }
+
     /**
      * Constructs a new instance of DataStorage, initializing the underlying storage
      * structure.
@@ -87,7 +96,7 @@ public class DataStorage {
         // DataReader is not defined in this scope, should be initialized appropriately.
         // DataReader reader = new SomeDataReaderImplementation("path/to/data");
         DataReader reader = new MockDataReader();
-        DataStorage storage = new DataStorage();
+        DataStorage storage = DataStorage.getInstance(); //singleton
 
         // Assuming the reader has been properly initialized and can read data into the
         // storage
