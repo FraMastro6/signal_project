@@ -2,9 +2,9 @@ package com.data_management;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import com.alerts.AlertGenerator;
 
 /**
@@ -14,13 +14,15 @@ import com.alerts.AlertGenerator;
  * patient IDs.
  */
 public class DataStorage {
-    private Map<Integer, Patient> patientMap; // Stores patient objects indexed by their unique patient ID.
+    private final Map<Integer, Patient> patientMap; // Stores patient objects indexed by their unique patient ID.
 
     //Singleton
-    private static DataStorage instance;
+    private volatile static DataStorage instance;
     public static DataStorage getInstance(){
         if(instance == null){
-            instance = new DataStorage();
+            synchronized (DataStorage.class) {
+                instance = new DataStorage();
+            }
         }
         return instance;
     }
@@ -29,8 +31,10 @@ public class DataStorage {
      * Constructs a new instance of DataStorage, initializing the underlying storage
      * structure.
      */
-    public DataStorage() {
-        this.patientMap = new HashMap<>();
+    //Fixed from public to private (correct singleton implementation)
+    private DataStorage() {
+        //Changed for thread safety
+        this.patientMap = new ConcurrentHashMap<>();
     }
 
     /**
@@ -46,13 +50,18 @@ public class DataStorage {
      * @param timestamp        the time at which the measurement was taken, in
      *                         milliseconds since the Unix epoch
      */
-    public void addPatientData(int patientId, double measurementValue, String recordType, long timestamp) {
+    public synchronized void addPatientData(int patientId, double measurementValue, String recordType, long timestamp) {
         Patient patient = patientMap.get(patientId);
         if (patient == null) {
             patient = new Patient(patientId);
             patientMap.put(patientId, patient);
         }
-        patient.addRecord(measurementValue, recordType, timestamp);
+        // prevent duplicates
+        boolean duplicate = patient.getRecords(timestamp, timestamp).stream().anyMatch(r -> r.getRecordType().equals(recordType));
+
+        if (!duplicate) {
+            patient.addRecord(measurementValue, recordType, timestamp);
+        }
     }
 
     /**
@@ -85,6 +94,11 @@ public class DataStorage {
         return new ArrayList<>(patientMap.values());
     }
 
+    // Used for clearing the map since we can't create new instances of DataStorage
+    public synchronized void clearAllData() {
+        patientMap.clear();
+    }
+
     /**
      * The main method for the DataStorage class.
      * Initializes the system, reads data into storage, and continuously monitors
@@ -93,13 +107,9 @@ public class DataStorage {
      * @param args command line arguments
      */
     public static void main(String[] args) {
-        // DataReader is not defined in this scope, should be initialized appropriately.
-        // DataReader reader = new SomeDataReaderImplementation("path/to/data");
-        DataReader reader = new MockDataReader();
+        DataReader reader = new FileDataReader("C:\\Users\\1fran\\Documents\\signal_project\\output");
         DataStorage storage = DataStorage.getInstance(); //singleton
 
-        // Assuming the reader has been properly initialized and can read data into the
-        // storage
         try {
             reader.readData(storage);
         } catch (IOException e) {

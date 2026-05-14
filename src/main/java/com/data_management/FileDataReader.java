@@ -45,9 +45,17 @@ public class FileDataReader implements DataReader {
 
                                 String label = line.split("Label:")[1].split(",")[0].trim();
 
-                                double value = Double.parseDouble(
-                                        line.split("Data:")[1].trim()
-                                );
+                                String rawData = line.split("Data:")[1].trim();
+
+                                // convert triggered/resolved to numeric values
+                                double value;
+                                if (rawData.equalsIgnoreCase("triggered")) {
+                                    value = 1.0;
+                                } else if (rawData.equalsIgnoreCase("resolved")) {
+                                    value = 0.0;
+                                } else {
+                                    value = Double.parseDouble(rawData);
+                                }
 
                                 dataStorage.addPatientData(
                                         patientId,
